@@ -1,0 +1,45 @@
+public function downloadImageFromUrl($url, $path) {
+        // 因为不知道最后接受到的文件是什么格式，先建立一个临时文件，用于保存
+        $tmpFile = tempnam(sys_get_temp_dir(), 'image');
+        # 文件下载 BEGIN #
+        // 打开临时文件，用于写入（w),b二进制文件
+        $resource = fopen($tmpFile, 'wb');
+        // 初始化curl
+        $curl = curl_init($url);
+        // 设置输出文件为刚打开的
+        curl_setopt($curl, CURLOPT_FILE, $resource);
+        // 不需要头文件
+        curl_setopt($curl, CURLOPT_HEADER, 0);
+        // 执行
+        curl_exec($curl);
+        // 关闭curl
+        curl_close($curl);
+        // 关闭文件
+        fclose($resource);
+        # 文件下载 END #
+        // 获取文件类型
+        if (function_exists('exif_imagetype')) {
+            // 读取一个图像的第一个字节并检查其签名(这里需要打开mbstring及php_exif)
+            $fileType = exif_imagetype($tmpFile);
+        } else {
+            // 获取文件大小，里面第二个参数是文件类型 （这里后缀可以直接通过getimagesize($url)来获取，但是很慢）
+            $fileInfo = getimagesize($tmpFile);
+            $fileType = $fileInfo[2];
+        }
+        // 根据文件类型获取后缀名
+        $extension = image_type_to_extension($fileType);
+        // 计算指定文件的 MD5 散列值，作为保存的文件名，重复下载同一个文件不会产生重复保存，相同的文件散列值相同
+        $md5FileName = md5_file($tmpFile);
+        // 最终保存的文件
+        $returnFile = $path . $md5FileName . $extension;
+        // 检查传过来的路径是否存在，不存在就创建
+        if (!is_dir($path)) {
+            mkdir($path, 0777, true);
+        }
+        // 复制临时文件到最终保存的文件中
+        copy($tmpFile, $returnFile);
+        // 释放临时文件
+        @unlink($tmpFile);
+        // 返回保存的文件路径
+        return $returnFile;
+    }
